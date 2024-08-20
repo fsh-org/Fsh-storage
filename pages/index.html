@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Fsh storage</title>
+    <!-- Boiler plate------ -->
+    <link rel="icon" href="https://fsh.plus/storage.jpg" type="image/jpeg">
+    <meta name="description" content="Fsh storage, store files easily.">
+    <!-- ------- -->
+    <link rel="stylesheet" href="https://fsh.plus/media/style.css">
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta property="og:image" content="https://fsh.plus/fsh.png"/>
+    <meta name="theme-color" content="#a89c9b">
+    <!-- ------------------ -->
+    <script src="https://account.fsh.plus/script.js"></script>
+    <style>
+      body {
+        text-align: center;
+      }
+      #usr-info {
+        display: flex;
+        justify-content: center;
+      }
+      .modal-close {
+        position: absolute;
+        top: 5px;
+        right: 7px;
+        padding: 0;
+        border: none;
+      }
+      .files {
+        display: flex;
+        flex-direction: column;
+      }
+      .files > div {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        width: 60vw;
+        padding: 3px;
+        margin: 0px auto;
+        border-radius: 0.5rem;
+        transition: 500ms;
+      }
+      .files > div:hover {
+        background-color: var(--bg-2);
+      }
+      .files p {
+        text-align: left;
+        word-break: break-word;
+      }
+      .f-name {
+        flex: 1;
+        cursor: pointer;
+      }
+      .f-size {
+        min-width: 10vw;
+      }
+      #zone {
+        height: 10vh;
+        width: 40vw;
+        margin: 5px auto;
+        border-radius: 0.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: 500ms;
+        background: 
+          linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
+          linear-gradient(0deg, var(--bg-2) 50%, transparent 50%),
+          linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
+          linear-gradient(0deg, var(--bg-2) 50%, transparent 50%);
+        background-repeat: repeat-x, repeat-y, repeat-x, repeat-y;
+        background-size: 15px 4px, 4px 15px, 15px 4px, 4px 15px;
+        background-position: left top, right top, left bottom, left top;
+        padding: 4px;
+        animation: border-dance 4s infinite linear;
+      }
+      @keyframes border-dance {
+        0% {
+          background-position: left top, right top, right bottom, left bottom;
+        }
+        100% {
+          background-position: right top, right bottom, left bottom, left top;
+        }
+      }
+      @media (max-width: 600px) {
+        .files > div {
+          width: 90vw;
+        }
+        .f-size {
+          display: none;
+        }
+        #zone {
+          width: 90vw;
+        }
+      }
+      .closed {
+        height: 0px !important;
+        margin: 0px auto !important;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body ondragover="drag(event, true)" ondragleave="drag(event, false)">
+    <a href="https://fsh.plus">
+      <table class="title">
+        <tr>
+          <td><video src="https://fsh.plus/fsh.webm" playsinline autoplay muted loop width="100" alt="Spining low quality fish"></video></td>
+          <td><h1>Fsh</h1></td>
+        </tr>
+      </table>
+    </a>
+    <h2 style="margin-top:-20px">Storage</h2>
+    <br>
+    <script>
+      function drop() {}
+      function drag(event, show) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (show) {
+          document.getElementById('zone').classList.remove('closed')
+        } else {
+          document.getElementById('zone').classList.add('closed')
+        }
+      }
+    </script>
+    <span id="usr-info">
+      <p>Loading</p>
+      <script>
+        window.account.info()
+          .then(d => {
+            document.getElementById('usr-info').innerHTML = `<p><a href="https://account.fsh.plus" target="_blank" style="color:var(--text-1);text-decoration:none;">Hello ${d.name}!</a></p>
+<img src="${d.avatar}" width="25" height="25" style="border-radius:2rem">`
+          })
+      </script>
+    </span>
+    <div class="action">
+      <input type="file" style="display:none" id="up">
+      <button onclick="up.click()">Upload</button>
+      <div id="zone" class="closed" ondrop="drop()">Drop here</div>
+      <dialog id="confirm"></dialog>
+      <script>
+        let up = document.getElementById("up");
+        let confirm = document.getElementById('confirm');
+
+        up.onchange = function() {
+          if(this.files[0].size > 26214400) {
+             alert("File too big (max 25MB)");
+             this.value = "";
+             return;
+          }
+          confirm.innerHTML = '<p>Uploading...</p>';
+          confirm.showModal()
+          let ch;
+          if (this.files[0].type.startsWith('image/')) {
+            ch = document.createElement('img')
+          } else if (this.files[0].type.startsWith('video/')) {
+            ch = document.createElement('video')
+          } else if (this.files[0].type.startsWith('audio/')) {
+            ch = document.createElement('audio')
+          } else {
+            ch = document.createElement('span')
+          }
+          ch.style['max-width'] = '20vw';
+          ch.style['max-height'] = '20vh';
+          ch.controls = true;
+          ch.src = URL.createObjectURL(this.files[0]);
+          confirm.appendChild(ch);
+          fetch('/api/upload?name='+this.files[0].name+'&type='+this.files[0].type, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/octet-stream'
+            },
+            body: this.files[0]
+          })
+            .then(async res => {
+              confirm.close();
+              setFiles();
+            })
+            .catch(err => {
+              confirm.innerHTML = '<p>Error: '+err+'</p>';
+            })
+        };
+      </script>
+    </div>
+    <br>
+    <dialog id="view"></dialog>
+    <div class="files"></div>
+    <script>
+      function formatBytes(bytes) {
+        bytes = Number(bytes);
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+      let viewm = document.getElementById('view');
+      function view(m, c, t) {
+        viewm.innerHTML = '<button onclick="this.parentElement.close()" class="modal-close">x</button>';
+        viewm.showModal()
+        let ch;
+        if (t.startsWith('image/')) {
+          ch = document.createElement('img')
+        } else if (t.startsWith('video/')) {
+          ch = document.createElement('video')
+        } else if (t.startsWith('audio/')) {
+          ch = document.createElement('audio')
+        } else {
+          ch = document.createElement('span')
+        }
+        ch.style['max-width'] = '60vw';
+        ch.style['max-height'] = '65vh';
+        ch.style['margin'] = '10px';
+        ch.controls = true;
+        ch.src = 'https://storage.fsh.plus/api/download?m='+m+'&c='+c;
+        viewm.appendChild(ch)
+      }
+      function download(m, c) {
+        window.open('https://storage.fsh.plus/api/download?m='+m+'&c='+c)
+      }
+      function remove(m, c) {
+        fetch('/api/delete?m='+m+'&c='+c)
+          .then(async del => {
+            setFiles();
+          })
+      }
+      function setFiles() {
+        fetch('/api/files')
+          .then(async res => {
+            res = await res.json();
+            document.querySelector('.files').innerHTML = res.reverse().map(f=>`<div>
+  <p class="f-name" onclick="view('${f.message}', '${f.channel}', '${f.type}')">${f.name}</p>
+  <p class="f-size">${formatBytes(f.size)}</p>
+  <button onclick="download('${f.message}', '${f.channel}')">Download</button>
+  <button onclick="remove('${f.message}', '${f.channel}')">Delete</button>
+</div>`).join('')
+          })
+      }
+      setFiles();
+    </script>
+  </body>
+</html>

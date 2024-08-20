@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>404 - Fsh Storage</title>
+    <title>Fsh storage</title>
     <!-- Boiler plate------ -->
     <link rel="icon" href="https://fsh.plus/storage.jpg" type="image/jpeg">
-    <meta name="description" content="404 Not found.">
+    <meta name="description" content="Fsh storage, store files easily.">
     <!-- ------- -->
     <link rel="stylesheet" href="https://fsh.plus/media/style.css">
     <meta charset="UTF-8">
@@ -14,22 +14,24 @@
     <meta name="theme-color" content="#a89c9b">
     <!-- ------------------ -->
     <script src="https://account.fsh.plus/script.js"></script>
-    <htms></htms>
     <style>
       body {
-        width: 100vw;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
+        text-align: center;
       }
     </style>
   </head>
   <body>
-    <h1>404 Not found</h1>
-    <p>Page not found</p>
-    <a href="/"><button>Home</button></a>
+    <a href="https://fsh.plus">
+      <table class="title">
+        <tr>
+          <td><video src="https://fsh.plus/fsh.webm" playsinline autoplay muted loop width="100" alt="Spining low quality fish"></video></td>
+          <td><h1>Fsh</h1></td>
+        </tr>
+      </table>
+    </a>
+    <h2 style="margin-top:-20px">Storage</h2>
+    <br>
+    <p>Please log in with discord to continue</p>
+    <button onclick="window.account.login().then(e=>location.reload())">Log in</button>
   </body>
 </html>
