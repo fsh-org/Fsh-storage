@@ -8,7 +8,7 @@ let nanoid;
   nanoid = nanid.nanoid;
 })();
 
-const PORT = 3000;
+const PORT = 10005;
 const Express = require('express')
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -337,11 +337,11 @@ app.post('/api/share', async function(req, res) {
   share.set(id, {
     message: req.query['m'],
     channel: req.query['c'],
-    link: link.url
+    link: link.url+'+'
   })
 
   res.json({
-    link: link.url
+    link: link.url+'+'
   })
 })
 app.post('/api/delete', async function(req, res) {
