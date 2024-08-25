@@ -96,6 +96,14 @@
         background: var(--bg-2);
         animation: none;
       }
+      pre {
+        width: fit-content;
+        margin: 10px auto 0px auto;
+        padding: 10px;
+        border-radius: 1rem;
+        cursor: pointer;
+        background-color: var(--bg-0);
+      }
       @keyframes border-dance {
         0% {
           background-position: left top, right top, right bottom, left bottom;
@@ -128,6 +136,9 @@
         display: flex;
         gap: 2px;
         flex-direction: column;
+      }
+      .tippy-arrow {
+        color: var(--bg-2);
       }
     </style>
     <script src="https://unpkg.com/@popperjs/core@2"></script>
@@ -233,6 +244,10 @@
       </script>
     </div>
     <br>
+    <dialog id="link">
+      <p>The link has been copied to your clipboard.</p>
+      <code><pre id="linkier" onclick="navigator.clipboard.writeText(this.innerText)"></pre></code>
+    </dialog>
     <div class="files"></div>
     <script>
       function formatBytes(bytes) {
@@ -259,7 +274,15 @@
         fetch('/api/share?m='+m+'&c='+c, { method: 'POST' })
           .then(async sha => {
             sha = await sha.json();
-            alert(sha.link)
+            navigator.clipboard.writeText(sha.link);
+            document.getElementById("linkier").innerText = sha.link;
+            document.getElementById("link").showModal();
+            tippy(document.getElementById('linkier'), {
+              appendTo: document.getElementById('link'),
+              content: 'Copied',
+              sticky: true,
+              trigger: 'click'
+            })
           })
       }
       function download(m, c) {
