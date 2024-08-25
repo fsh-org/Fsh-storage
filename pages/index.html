@@ -25,7 +25,9 @@
       .modal-close {
         position: absolute;
         top: 5px;
-        right: 7px;
+        right: 5px;
+        width: 18px;
+        height: 18px;
         padding: 0;
         border: none;
       }
@@ -47,25 +49,37 @@
         background-color: var(--bg-2);
       }
       .files p {
+        display: flex;
         text-align: left;
         word-break: break-word;
+      }
+      .files > div > button {
+        padding: 2px;
+        border: none;
+      }
+      .danger {
+        color: #f66;
+        border: 2px #f66 solid;
+      }
+      .danger:hover {
+        color: var(--bg-1);
+        background-color: #f66;
       }
       .f-name {
         flex: 1;
         cursor: pointer;
       }
-      .f-size {
-        min-width: 10vw;
-      }
       #zone {
-        height: 10vh;
-        width: 40vw;
-        margin: 5px auto;
-        border-radius: 0.5rem;
         display: flex;
         justify-content: center;
         align-items: center;
-        transition: 500ms;
+        height: 10vh;
+        width: 40vw;
+        box-sizing: border-box;
+        margin: 5px auto;
+        padding: 4px;
+        border: 0px var(--bg-2) solid;
+        border-radius: 0.5rem;
         background: 
           linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
           linear-gradient(0deg, var(--bg-2) 50%, transparent 50%),
@@ -74,8 +88,13 @@
         background-repeat: repeat-x, repeat-y, repeat-x, repeat-y;
         background-size: 15px 4px, 4px 15px, 15px 4px, 4px 15px;
         background-position: left top, right top, left bottom, left top;
-        padding: 4px;
         animation: border-dance 4s infinite linear;
+        transition: all 500ms ease-in-out;
+      }
+      #zone.hover {
+        border: 2px var(--bg-3) solid;
+        background: var(--bg-2);
+        animation: none;
       }
       @keyframes border-dance {
         0% {
@@ -101,7 +120,18 @@
         margin: 0px auto !important;
         opacity: 0;
       }
+      .tippy-box {
+        background-color: var(--bg-2);
+        color: var(--text-1);
+      }
+      .tippy-content {
+        display: flex;
+        gap: 2px;
+        flex-direction: column;
+      }
     </style>
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
   </head>
   <body ondragover="drag(event, true)" ondragleave="drag(event, false)">
     <a href="https://fsh.plus">
@@ -114,18 +144,6 @@
     </a>
     <h2 style="margin-top:-20px">Storage</h2>
     <br>
-    <script>
-      function drop() {}
-      function drag(event, show) {
-        event.stopPropagation();
-        event.preventDefault();
-        if (show) {
-          document.getElementById('zone').classList.remove('closed')
-        } else {
-          document.getElementById('zone').classList.add('closed')
-        }
-      }
-    </script>
     <span id="usr-info">
       <p>Loading</p>
       <script>
@@ -136,57 +154,85 @@
           })
       </script>
     </span>
+    <dialog id="preview"></dialog>
     <div class="action">
       <input type="file" style="display:none" id="up">
       <button onclick="up.click()">Upload</button>
-      <div id="zone" class="closed" ondrop="drop()">Drop here</div>
-      <dialog id="confirm"></dialog>
+      <div id="zone" class="closed" ondragover="drag(event, true, true)" ondrop="drop()">Drop here</div>
       <script>
-        let up = document.getElementById("up");
-        let confirm = document.getElementById('confirm');
-
-        up.onchange = function() {
-          if(this.files[0].size > 26214400) {
+        const typeToElement = {
+          image: 'img',
+          video: 'video',
+          audio: 'audio',
+          other: 'span'
+        }
+        function previewFile(text, direct, pointer) {
+          let dialog = document.getElementById('preview');
+          let type = pointer.type.split('/')[0];
+          if (!Object.keys(typeToElement).includes(type)) type = 'other';
+          dialog.innerHTML = `${text}
+<${typeToElement[type]} controls src="${direct ? URL.createObjectURL(pointer) : pointer.url}" style="max-width:60vw;max-height:65vh;margin:10px;"></${typeToElement[type]}>`
+          dialog.showModal();
+        }
+        function uploadFile(file) {
+          if(file.size > 26214400) {
              alert("File too big (max 25MB)");
-             this.value = "";
              return;
           }
-          confirm.innerHTML = '<p>Uploading...</p>';
-          confirm.showModal()
-          let ch;
-          if (this.files[0].type.startsWith('image/')) {
-            ch = document.createElement('img')
-          } else if (this.files[0].type.startsWith('video/')) {
-            ch = document.createElement('video')
-          } else if (this.files[0].type.startsWith('audio/')) {
-            ch = document.createElement('audio')
-          } else {
-            ch = document.createElement('span')
-          }
-          ch.style['max-width'] = '20vw';
-          ch.style['max-height'] = '20vh';
-          ch.controls = true;
-          ch.src = URL.createObjectURL(this.files[0]);
-          confirm.appendChild(ch);
-          fetch('/api/upload?name='+this.files[0].name+'&type='+this.files[0].type, {
+          previewFile('<p>Uploading...</p>', true, file)
+          fetch('/api/upload?name='+file.name+'&type='+file.type, {
             method: 'POST',
             headers: {
               'content-type': 'application/octet-stream'
             },
-            body: this.files[0]
+            body: file
           })
             .then(async res => {
-              confirm.close();
+              document.getElementById('preview').close();
               setFiles();
             })
             .catch(err => {
-              confirm.innerHTML = '<p>Error: '+err+'</p>';
+              document.getElementById('preview').innerHTML = '<p>Error: '+err+'</p>';
             })
+        }
+
+        const zone = document.getElementById('zone');
+        function drop() {
+          event.preventDefault();
+          zone.classList.add('closed')
+          zone.classList.remove('hover')
+          let file;
+          if (event.dataTransfer.items) {
+            file = event.dataTransfer.items[0];
+            if (file.kind !== "file") return;
+            file = file.getAsFile();
+          } else {
+            file = event.dataTransfer.files[0];
+          }
+          if (!file) return;
+          uploadFile(file)
+        }
+        function drag(event, show, hover = false) {
+          event.stopPropagation();
+          event.preventDefault();
+          if (show) {
+            zone.classList.remove('closed')
+            if (hover) {
+              zone.classList.add('hover')
+            } else {
+              zone.classList.remove('hover')
+            }
+          } else {
+            zone.classList.add('closed')
+          }
+        }
+
+        document.getElementById("up").onchange = function() {
+          uploadFile(this.files[0])
         };
       </script>
     </div>
     <br>
-    <dialog id="view"></dialog>
     <div class="files"></div>
     <script>
       function formatBytes(bytes) {
@@ -197,32 +243,30 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       }
-      let viewm = document.getElementById('view');
       function view(m, c, t) {
-        viewm.innerHTML = '<button onclick="this.parentElement.close()" class="modal-close">x</button>';
-        viewm.showModal()
-        let ch;
-        if (t.startsWith('image/')) {
-          ch = document.createElement('img')
-        } else if (t.startsWith('video/')) {
-          ch = document.createElement('video')
-        } else if (t.startsWith('audio/')) {
-          ch = document.createElement('audio')
-        } else {
-          ch = document.createElement('span')
-        }
-        ch.style['max-width'] = '60vw';
-        ch.style['max-height'] = '65vh';
-        ch.style['margin'] = '10px';
-        ch.controls = true;
-        ch.src = 'https://storage.fsh.plus/api/download?m='+m+'&c='+c;
-        viewm.appendChild(ch)
+        previewFile('<button onclick="this.parentElement.close()" class="modal-close">x</button>', false, {
+          type: t,
+          url: 'https://storage.fsh.plus/api/download?m='+m+'&c='+c
+        })
+      }
+      function rename(m, c, n) {
+        fetch('/api/rename?m='+m+'&c='+c+'&name='+n, { method: 'POST' })
+          .then(async nam => {
+            setFiles();
+          })
+      }
+      function share(m, c) {
+        fetch('/api/share?m='+m+'&c='+c, { method: 'POST' })
+          .then(async sha => {
+            sha = await sha.json();
+            alert(sha.link)
+          })
       }
       function download(m, c) {
         window.open('https://storage.fsh.plus/api/download?m='+m+'&c='+c)
       }
       function remove(m, c) {
-        fetch('/api/delete?m='+m+'&c='+c)
+        fetch('/api/delete?m='+m+'&c='+c, { method: 'POST' })
           .then(async del => {
             setFiles();
           })
@@ -231,12 +275,30 @@
         fetch('/api/files')
           .then(async res => {
             res = await res.json();
-            document.querySelector('.files').innerHTML = res.reverse().map(f=>`<div>
+            document.querySelector('.files').innerHTML = '';
+            let num = 1;
+            res
+              .reverse()
+              .forEach(f => {
+                document.querySelector('.files').insertAdjacentHTML('beforeend', `<div>
   <p class="f-name" onclick="view('${f.message}', '${f.channel}', '${f.type}')">${f.name}</p>
   <p class="f-size">${formatBytes(f.size)}</p>
-  <button onclick="download('${f.message}', '${f.channel}')">Download</button>
-  <button onclick="remove('${f.message}', '${f.channel}')">Delete</button>
-</div>`).join('')
+  <button id="o${num}"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256"><path fill-rule="evenodd" clip-rule="evenodd" d="M104 33.5C104 20.5213 114.521 10 127.5 10C140.479 10 151 20.5213 151 33.5C151 46.4787 140.479 57 127.5 57C114.521 57 104 46.4787 104 33.5ZM104 127.5C104 114.521 114.521 104 127.5 104C140.479 104 151 114.521 151 127.5C151 140.479 140.479 151 127.5 151C114.521 151 104 140.479 104 127.5ZM127.5 198C114.521 198 104 208.521 104 221.5C104 234.479 114.521 245 127.5 245C140.479 245 151 234.479 151 221.5C151 208.521 140.479 198 127.5 198Z"/></svg></button>
+</div>`)
+                tippy(document.getElementById('o'+num), {
+                  content: `<button onclick="rename('${f.message}', '${f.channel}', prompt('New name', '${f.name}'))">Rename</button>
+<button onclick="share('${f.message}', '${f.channel}')">Share</button>
+<button onclick="download('${f.message}', '${f.channel}')">Download</button>
+<button class="danger" onclick="remove('${f.message}', '${f.channel}')">Delete</button>`,
+                  allowHTML: true,
+                  sticky: true,
+                  interactive: true,
+                  arrow: false,
+                  placement: 'right',
+                  trigger: 'click'
+                })
+                num += 1;
+              })
           })
       }
       setFiles();

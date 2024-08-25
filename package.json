@@ -6,7 +6,7 @@
     "discord.js": "^14.15.3",
     "express": "^4.19.2",
     "fshdb": "^1.0.0-beta",
-    "path": "^0.12.7",
+    "nanoid": "^5.0.7",
     "server-htms": "^0.1.1"
   }
 }
