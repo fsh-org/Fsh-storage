@@ -8,7 +8,7 @@ let nanoid;
   nanoid = nanid.nanoid;
 })();
 
-const PORT = 10005;
+const PORT = 3000;
 const Express = require('express')
 const bodyParser = require('body-parser');
 const cors = require('cors');
