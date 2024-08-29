@@ -245,6 +245,7 @@
     </div>
     <br>
     <dialog id="link">
+      <button onclick="this.parentElement.close()" class="modal-close">x</button>
       <p>The link has been copied to your clipboard.</p>
       <code><pre id="linkier" onclick="navigator.clipboard.writeText(this.innerText)"></pre></code>
     </dialog>
