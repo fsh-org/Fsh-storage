@@ -266,6 +266,7 @@
         })
       }
       function rename(m, c, n) {
+        if (n===null) return;
         fetch('/api/rename?m='+m+'&c='+c+'&name='+n, { method: 'POST' })
           .then(async nam => {
             setFiles();
