@@ -104,6 +104,16 @@
         cursor: pointer;
         background-color: var(--bg-0);
       }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 60vw;
+        margin: 0px auto 4px auto;
+      }
+      .head p {
+        flex: 1;
+      }
       @keyframes border-dance {
         0% {
           background-position: left top, right top, right bottom, left bottom;
@@ -112,15 +122,12 @@
           background-position: right top, right bottom, left bottom, left top;
         }
       }
-      @media (max-width: 600px) {
-        .files > div {
+      @media (max-width: 700px) {
+        .files > div, .head, #zone {
           width: 90vw;
         }
         .f-size {
           display: none;
-        }
-        #zone {
-          width: 90vw;
         }
       }
       .closed {
@@ -296,15 +303,53 @@
             setFiles();
           })
       }
+      if (!localStorage.getItem('sort')) {
+        localStorage.setItem('sort', 'new');
+      }
+      const sortText = {
+        new: 'Newest first',
+        old: 'Oldest first',
+        alpha: 'A to Z',
+        zeta: 'Z to A',
+        big: 'Biggest first',
+        small: 'Smallest first'
+      }
       function setFiles() {
         fetch('/api/files')
           .then(async res => {
             res = await res.json();
-            document.querySelector('.files').innerHTML = '';
+            document.querySelector('.files').innerHTML = `<span class="head"><p>${res.length} files</p><button>${sortText[localStorage.getItem('sort')]}</button></span>`;
+            tippy('.head button', {
+              content: Object.keys(sortText).map(k => `<button onclick="localStorage.setItem('sort', '${k}');setFiles()">${sortText[k]}</button>`).join(''),
+              allowHTML: true,
+              sticky: true,
+              interactive: true,
+              arrow: false,
+              placement: 'right',
+              trigger: 'click'
+            })
+            switch (localStorage.getItem('sort')) {
+              case 'new':
+                res = res.reverse();
+                break;
+              case 'old':
+                break;
+              case 'alpha':
+                res.sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase())});
+                break;
+              case 'zeta':
+                res.sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase())});
+                res = res.reverse();
+                break;
+              case 'big':
+                res.sort(function(a,b){return b.size-a.size});
+                break;
+              case 'small':
+                res.sort(function(a,b){return a.size-b.size});
+                break;
+            }
             let num = 1;
-            res
-              .reverse()
-              .forEach(f => {
+            res.forEach(f => {
                 document.querySelector('.files').insertAdjacentHTML('beforeend', `<div>
   <p class="f-name" onclick="view('${f.message}', '${f.channel}', '${f.type}')">${f.name}</p>
   <p class="f-size">${formatBytes(f.size)}</p>
@@ -327,6 +372,17 @@
           })
       }
       setFiles();
+    </script>
+    <script>
+      Array.from(document.querySelectorAll('dialog')).forEach(dialog => {
+        dialog.addEventListener('click', function(event) {
+          var rect = dialog.getBoundingClientRect();
+          var isInDialog = (rect.top <= event.clientY && event.clientY <= rect.top + rect.height && rect.left <= event.clientX && event.clientX <= rect.left + rect.width);
+          if (!isInDialog) {
+            dialog.close();
+          }
+        });
+      })
     </script>
   </body>
 </html>
