@@ -114,6 +114,10 @@
       .head p {
         flex: 1;
       }
+      .head button {
+        display: flex;
+        align-items: center;
+      }
       @keyframes border-dance {
         0% {
           background-position: left top, right top, right bottom, left bottom;
@@ -174,7 +178,7 @@
     </span>
     <dialog id="preview"></dialog>
     <div class="action">
-      <input type="file" style="display:none" id="up">
+      <input id="up" type="file" multiple style="display:none">
       <button onclick="up.click()">Upload</button>
       <div id="zone" class="closed" ondragover="drag(event, true, true)" ondrop="drop()">Drop here</div>
       <script>
@@ -186,32 +190,40 @@
         }
         function previewFile(text, direct, pointer) {
           let dialog = document.getElementById('preview');
+          dialog.showModal();
           let type = pointer.type.split('/')[0];
           if (!Object.keys(typeToElement).includes(type)) type = 'other';
           dialog.innerHTML = `${text}
 <${typeToElement[type]} controls src="${direct ? URL.createObjectURL(pointer) : pointer.url}" style="max-width:60vw;max-height:65vh;margin:10px;"></${typeToElement[type]}>`
-          dialog.showModal();
         }
         function uploadFile(file) {
-          if(file.size > 26214400) {
-             alert("File too big (max 25MB)");
-             return;
+          return new Promise((resolve, reject) => {
+            if(file.size > 26214400) {
+              alert("File too big (max 25MB)");
+              reject();
+            }
+            previewFile('<p>Uploading...</p>', true, file)
+            fetch('/api/upload?name='+file.name+'&type='+file.type, {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/octet-stream'
+              },
+              body: file
+            })
+              .then(res => {
+                setFiles();
+                resolve()
+              })
+              .catch(err => {
+                document.getElementById('preview').innerHTML = '<p>Error: '+err+'</p>';
+                reject();
+              })
+          });
+        }
+        function uploadMultiple(files) {
+          for (let i = 0; i<files.length; i++) {
+            uploadFile(files[i]).then(r=>{if(i===(files.length-1)){document.getElementById('preview').close()}})
           }
-          previewFile('<p>Uploading...</p>', true, file)
-          fetch('/api/upload?name='+file.name+'&type='+file.type, {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/octet-stream'
-            },
-            body: file
-          })
-            .then(async res => {
-              document.getElementById('preview').close();
-              setFiles();
-            })
-            .catch(err => {
-              document.getElementById('preview').innerHTML = '<p>Error: '+err+'</p>';
-            })
         }
 
         const zone = document.getElementById('zone');
@@ -219,16 +231,16 @@
           event.preventDefault();
           zone.classList.add('closed')
           zone.classList.remove('hover')
-          let file;
+          let files;
           if (event.dataTransfer.items) {
-            file = event.dataTransfer.items[0];
-            if (file.kind !== "file") return;
-            file = file.getAsFile();
+            files = Array.from(event.dataTransfer.items)
+              .filter(f=>f.kind==='file')
+              .map(f=>f.getAsFile());
           } else {
-            file = event.dataTransfer.files[0];
+            files = event.dataTransfer.files;
           }
-          if (!file) return;
-          uploadFile(file)
+          if (!files[0]) return;
+          uploadMultiple(files)
         }
         function drag(event, show, hover = false) {
           event.stopPropagation();
@@ -246,7 +258,7 @@
         }
 
         document.getElementById("up").onchange = function() {
-          uploadFile(this.files[0])
+          uploadMultiple(Array.from(this.files))
         };
       </script>
     </div>
@@ -312,13 +324,15 @@
         alpha: 'A to Z',
         zeta: 'Z to A',
         big: 'Biggest first',
-        small: 'Smallest first'
+        small: 'Smallest first',
+        filea: 'Type A to Z',
+        filez: 'Type Z to A'
       }
       function setFiles() {
         fetch('/api/files')
           .then(async res => {
             res = await res.json();
-            document.querySelector('.files').innerHTML = `<span class="head"><p>${res.length} files</p><button>${sortText[localStorage.getItem('sort')]}</button></span>`;
+            document.querySelector('.files').innerHTML = `<span class="head"><p>${res.length} files</p><button><svg width="16" height="16" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><path d="M26.8415 47.5962C23.1204 42.2949 26.9126 35 33.3895 35H221.611C228.087 35 231.88 42.2949 228.158 47.5961L154.875 152L134.048 181.671C130.862 186.21 124.138 186.21 120.952 181.671L100.125 152L26.8415 47.5962Z"/><path d="M100 126C100 121.582 103.582 118 108 118H147C151.418 118 155 121.582 155 126V214.711C155 217.639 151.956 219.575 149.304 218.333L103.456 196.868C101.347 195.881 100 193.763 100 191.434V126Z"/></svg>${sortText[localStorage.getItem('sort')]}</button></span>`;
             tippy('.head button', {
               content: Object.keys(sortText).map(k => `<button onclick="localStorage.setItem('sort', '${k}');setFiles()">${sortText[k]}</button>`).join(''),
               allowHTML: true,
@@ -338,14 +352,19 @@
                 res.sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase())});
                 break;
               case 'zeta':
-                res.sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase())});
-                res = res.reverse();
+                res.sort(function(b,a){return a.name.toLowerCase().localeCompare(b.name.toLowerCase())});
                 break;
               case 'big':
                 res.sort(function(a,b){return b.size-a.size});
                 break;
               case 'small':
-                res.sort(function(a,b){return a.size-b.size});
+                res.sort(function(b,a){return b.size-a.size});
+                break;
+              case 'filea':
+                res.sort(function(a,b){return a.name.toLowerCase().split('.').reverse().join('.').localeCompare(b.name.split('.').reverse().join('.').toLowerCase())});
+                break;
+              case 'filez':
+                res.sort(function(b,a){return a.name.split('.').reverse().join('.').toLowerCase().localeCompare(b.name.split('.').reverse().join('.').toLowerCase())});
                 break;
             }
             let num = 1;
