@@ -53,11 +53,11 @@ process.on('uncaughtException', function(err) {
 function getCookie(req, name) {
   let cookies = req.headers.cookie;
   cookies = String(cookies)
-    ?.split(' ')
-    ?.filter(cookie => cookie.startsWith(name+'='))[0]
+    .split(' ')
+    .filter(cookie => cookie.startsWith(name+'='))[0]
     ?.split(';')[0]
     ?.split('=')[1];
-  return cookies || '';
+  return cookies ?? '';
 }
 let tokenCache = {};
 async function getUser(req) {
