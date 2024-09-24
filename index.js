@@ -52,9 +52,10 @@ process.on('uncaughtException', function(err) {
 /* Useful functions*/
 function getCookie(req, name) {
   let cookies = req.headers.cookie;
+  name += '=';
   cookies = String(cookies)
     .split(' ')
-    .filter(cookie => cookie.startsWith(name+'='))[0]
+    .filter(cookie => cookie.startsWith(name))[0]
     ?.split(';')[0]
     ?.split('=')[1];
   return cookies ?? '';
