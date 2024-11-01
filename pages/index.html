@@ -201,6 +201,7 @@
             if(file.size > 26214400) {
               alert("File too big (max 25MB)");
               reject();
+              return;
             }
             previewFile('<p>Uploading...</p>', true, file)
             fetch('/api/upload?name='+file.name+'&type='+file.type, {
