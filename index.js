@@ -8,34 +8,14 @@ let nanoid;
   nanoid = nanid.nanoid;
 })();
 
-const PORT = 3000;
-const Express = require('express')
+const PORT = 10005;
+const Express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const htms = require('server-htms');
 const app = Express();
 
-const { Client, Events, GatewayIntentBits, Partials, ChannelType, AttachmentBuilder } = require('discord.js');
-
-const server = process.env['server'];
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ],
-  partials: [
-    Partials.Message,
-    Partials.Channel
-  ]
-});
-
-client.once(Events.ClientReady, readyClient => {
-  console.log(`Bot logged in as ${readyClient.user.tag}`);
-});
-
-client.login(process.env['token']);
+const { Blob } = require('node:buffer');
 
 /* Databases */
 const { DB } = require("fshdb")
@@ -82,14 +62,14 @@ function encrypt(file, id) {
 app.use(cors());
 app.use(bodyParser.urlencoded({
   extended: true,
-  limit: '25mb'
+  limit: '50mb'
 }));
 app.use(bodyParser.raw({
   type: '*/*',
-  limit: '25mb'
+  limit: '50mb'
 }));
 app.use(bodyParser.json({
-  limit: '25mb'
+  limit: '50mb'
 }));
 app.use(htms)
 app.use(function(req, res, next) {
@@ -137,13 +117,18 @@ app.get('/share', async function(req, res) {
     return;
   }
   let file = files.get(usr).filter(f=>f.channel===sh.channel&&f.message===sh.message)[0];
-  let message = await client.guilds.cache.get(server).channels.cache.get(sh.channel)?.messages?.fetch(sh.message);
+  let message = await fetch(`https://discord.com/api/v10/channels/${sh.channel}/messages/${sh.message}`, {
+    headers: {
+      authorization: 'Bot '+process.env['token']
+    }
+  });
+  message = await message.json();
   if (!message) {
     share.remove(req.query['id']);
     res.redirect('/');
     return;
   }
-  fetch(message.attachments.first().url)
+  fetch(message.attachments[0].url)
     .then(async re => {
       re = await re.arrayBuffer();
       re = encrypt(Buffer.from(re), usr);
@@ -184,27 +169,30 @@ app.post('/api/upload', async function(req, res) {
     return;
   }
   let user = await getUser(req);
-  let channel = await client.guilds.cache.get(server).channels.cache.find(channel => channel.name === 'f'+user);
-  if (!channel) {
-    channel = await client.guilds.cache.get(server).channels.create({
-      name: "f"+user,
-      type: ChannelType.GuildText
-    })
-  }
-  let attachment = new AttachmentBuilder(encrypt(Buffer.from(req.body), user), { name: req.query['name'].length ? req.query['name'] : 'file' });
-
-  let msg = await channel.send({
-    files: [attachment]
+  let formData = new FormData();
+  formData.append('file[0]', new Blob([encrypt(Buffer.from(req.body), user)], { type: (req.query['type'] ?? '') }), (req.query['name'].length ? req.query['name'] : 'file'));
+  let msg = await fetch(`https://discord.com/api/v10/channels/${process.env['channel']}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bot '+process.env['token']
+    },
+    body: formData
   })
+  msg = await msg.json();
+  if (msg.code == 50006) {
+    res.status(400);
+    res.json({});
+    return;
+  }
   files.push(user, {
     name: req.query['name'].length ? req.query['name'] : 'file',
-    type: (req.query['type'] || ''),
+    type: (req.query['type'] ?? ''),
     size: req.body.length,
     message: msg.id,
-    channel: channel.id
+    channel: process.env['channel']
   })
-  res.status(200)
-  res.json({})
+  res.status(200);
+  res.json({});
 })
 app.get('/api/download', async function(req, res) {
   if (!await getUser(req)) {
@@ -232,7 +220,12 @@ app.get('/api/download', async function(req, res) {
     });
     return;
   }
-  let message = await client.guilds.cache.get(server).channels.cache.get(req.query['c']).messages.fetch(req.query['m']);
+  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']}/messages/${req.query['m']}`, {
+    headers: {
+      authorization: 'Bot '+process.env['token']
+    }
+  });
+  message = await message.json();
   if (!message) {
     res.status(404);
     res.json({
@@ -242,7 +235,7 @@ app.get('/api/download', async function(req, res) {
     return;
   }
   let file = files.get(user).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0];
-  fetch(message.attachments.first().url)
+  fetch(message.attachments[0].url)
     .then(async re => {
       re = await re.arrayBuffer();
       re = encrypt(Buffer.from(re), user);
@@ -332,7 +325,7 @@ app.post('/api/share', async function(req, res) {
     })
     return;
   }
-  let id = nanoid(100)
+  let id = nanoid(100);
   let link = await fetch(`https://link.fsh.plus/create?url=${encodeURIComponent(`https://storage.fsh.plus/share?id=${id}`)}&time=0&uses=0`, { method: 'POST' });
   link = await link.json();
   share.set(id, {
@@ -370,16 +363,12 @@ app.post('/api/delete', async function(req, res) {
     });
     return;
   }
-  let message = await client.guilds.cache.get(server).channels.cache.get(req.query['c']).messages.fetch(req.query['m']);
-  if (!message) {
-    res.status(404);
-    res.json({
-      err: true,
-      msg: 'Could not find file'
-    });
-    return;
-  }
-  await message.delete();
+  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']}/messages/${req.query['m']}`, {
+    method: 'DELETE',
+    headers: {
+      authorization: 'Bot '+process.env['token']
+    }
+  });
   files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.channel!==req.query['c']||f.message!==req.query['m']))
   res.json({});
 })

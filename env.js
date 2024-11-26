@@ -1,4 +1,4 @@
 module.exports = {
-  server: 'server id',
+  channel: 'channel id',
   token: 'bot token'
 };
