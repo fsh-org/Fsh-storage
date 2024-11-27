@@ -43,7 +43,7 @@
         padding: 3px;
         margin: 0px auto;
         border-radius: 0.5rem;
-        transition: 500ms;
+        transition: background 500ms;
       }
       .files > div:hover {
         background-color: var(--bg-2);
@@ -111,7 +111,7 @@
         width: 60vw;
         margin: 0px auto 4px auto;
       }
-      .head p {
+      .head span {
         flex: 1;
       }
       .head button {
@@ -198,8 +198,8 @@
         }
         function uploadFile(file) {
           return new Promise((resolve, reject) => {
-            if(file.size > 26214400) {
-              alert("File too big (max 25MB)");
+            if(file.size > 100 * 1024 * 1024) {
+              alert("File too big (max 100MB)");
               reject();
               return;
             }
@@ -333,7 +333,7 @@
         fetch('/api/files')
           .then(async res => {
             res = await res.json();
-            document.querySelector('.files').innerHTML = `<span class="head"><p>${res.length} files</p><button><svg width="16" height="16" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><path d="M26.8415 47.5962C23.1204 42.2949 26.9126 35 33.3895 35H221.611C228.087 35 231.88 42.2949 228.158 47.5961L154.875 152L134.048 181.671C130.862 186.21 124.138 186.21 120.952 181.671L100.125 152L26.8415 47.5962Z"/><path d="M100 126C100 121.582 103.582 118 108 118H147C151.418 118 155 121.582 155 126V214.711C155 217.639 151.956 219.575 149.304 218.333L103.456 196.868C101.347 195.881 100 193.763 100 191.434V126Z"/></svg>${sortText[localStorage.getItem('sort')]}</button></span>`;
+            document.querySelector('.files').innerHTML = `<span class="head"><p>${res.length} files&nbsp;</p><svg onclick="setFiles()" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256"><path fill-rule="evenodd" clip-rule="evenodd" d="M234.004 58.3242L252.912 50.2979C254.471 49.6362 256.096 51.0903 255.61 52.7126L237.912 111.82C237.553 113.02 236.191 113.598 235.078 113.023L180.266 84.694C178.762 83.9165 178.844 81.7379 180.403 81.0763L200.813 72.4128C185.798 54.1906 163.478 42.0881 138.041 40.755C89.9293 38.2336 48.8832 75.1916 46.3618 123.303C43.8404 171.415 80.7984 212.461 128.91 214.982C156.471 216.426 181.714 204.915 198.723 185.772C205.1 178.596 215.592 175.582 223.942 180.319C232.417 185.126 235.434 196.021 229.387 203.66C205.637 233.662 168.199 252.089 127.078 249.934C59.6632 246.401 7.87671 188.886 11.4098 121.471C14.9428 54.0564 72.4576 2.26992 139.872 5.80298C179.19 7.86352 213.192 28.2855 234.004 58.3242Z"/></svg><span></span><button><svg width="16" height="16" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><path d="M26.8415 47.5962C23.1204 42.2949 26.9126 35 33.3895 35H221.611C228.087 35 231.88 42.2949 228.158 47.5961L154.875 152L134.048 181.671C130.862 186.21 124.138 186.21 120.952 181.671L100.125 152L26.8415 47.5962Z"/><path d="M100 126C100 121.582 103.582 118 108 118H147C151.418 118 155 121.582 155 126V214.711C155 217.639 151.956 219.575 149.304 218.333L103.456 196.868C101.347 195.881 100 193.763 100 191.434V126Z"/></svg>${sortText[localStorage.getItem('sort')]}</button></span>`;
             tippy('.head button', {
               content: Object.keys(sortText).map(k => `<button onclick="localStorage.setItem('sort', '${k}');setFiles()">${sortText[k]}</button>`).join(''),
               allowHTML: true,

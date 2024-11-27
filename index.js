@@ -8,7 +8,6 @@ let nanoid;
   nanoid = nanid.nanoid;
 })();
 
-const PORT = 10005;
 const Express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -62,14 +61,14 @@ function encrypt(file, id) {
 app.use(cors());
 app.use(bodyParser.urlencoded({
   extended: true,
-  limit: '50mb'
+  limit: '100mb'
 }));
 app.use(bodyParser.raw({
   type: '*/*',
-  limit: '50mb'
+  limit: '100mb'
 }));
 app.use(bodyParser.json({
-  limit: '50mb'
+  limit: '100mb'
 }));
 app.use(htms)
 app.use(function(req, res, next) {
@@ -107,9 +106,19 @@ app.get('/', async function(req, res) {
   }
 })
 app.get('/share', async function(req, res) {
-  if (!req.query['id']) res.redirect('/');
-  if (!share.has(req.query['id'])) res.redirect('/');
+  if (!req.query['id']) {
+    res.redirect('/');
+    return;
+  }
+  if (!share.has(req.query['id'])) {
+    res.redirect('/');
+    return;
+  }
   let sh = share.get(req.query['id']);
+  if (!sh.message) {
+    res.redirect('/');
+    return;
+  }
   let usr = files.find(u=>u.filter(f=>f.channel===sh.channel&&f.message===sh.message)[0])[0];
   if (!usr) {
     share.remove(req.query['id']);
@@ -128,15 +137,17 @@ app.get('/share', async function(req, res) {
     res.redirect('/');
     return;
   }
-  fetch(message.attachments[0].url)
-    .then(async re => {
-      re = await re.arrayBuffer();
-      re = encrypt(Buffer.from(re), usr);
-      res.status(200)
-      res.set('content-type', file.type);
-      res.set('content-disposition', 'inline; filename="'+file.name+'"');
-      res.send(re)
-    })
+  let buffers = [];
+  for (let i = 0; i<message.attachments.length; i++) {
+    let f = await fetch(message.attachments[i].url);
+    f = await f.arrayBuffer();
+    buffers.push(Buffer.from(f));
+  }
+  let buff = encrypt(Buffer.concat(buffers), usr);
+  res.status(200);
+  res.set('content-type', file.type);
+  res.set('content-disposition', 'attachment; filename="'+file.name+'"');
+  res.send(buff);
 })
 
 /* API */
@@ -169,8 +180,12 @@ app.post('/api/upload', async function(req, res) {
     return;
   }
   let user = await getUser(req);
+  const filePartSize = 25*1024*1024;
+  let enc = encrypt(Buffer.from(req.body), user);
   let formData = new FormData();
-  formData.append('file[0]', new Blob([encrypt(Buffer.from(req.body), user)], { type: (req.query['type'] ?? '') }), (req.query['name'].length ? req.query['name'] : 'file'));
+  for (let i = 0; i<enc.length; i+=filePartSize) {
+    formData.append('file['+(i/filePartSize)+']', new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.txt');
+  }
   let msg = await fetch(`https://discord.com/api/v10/channels/${process.env['channel']}/messages`, {
     method: 'POST',
     headers: {
@@ -179,7 +194,7 @@ app.post('/api/upload', async function(req, res) {
     body: formData
   })
   msg = await msg.json();
-  if (msg.code == 50006) {
+  if (!msg.id) {
     res.status(400);
     res.json({});
     return;
@@ -235,15 +250,17 @@ app.get('/api/download', async function(req, res) {
     return;
   }
   let file = files.get(user).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0];
-  fetch(message.attachments[0].url)
-    .then(async re => {
-      re = await re.arrayBuffer();
-      re = encrypt(Buffer.from(re), user);
-      res.status(200)
-      res.set('content-type', file.type);
-      res.set('content-disposition', 'attachment; filename="'+file.name+'"');
-      res.send(re)
-    })
+  let buffers = [];
+  for (let i = 0; i<message.attachments.length; i++) {
+    let f = await fetch(message.attachments[i].url);
+    f = await f.arrayBuffer();
+    buffers.push(Buffer.from(f));
+  }
+  let buff = encrypt(Buffer.concat(buffers), user);
+  res.status(200);
+  res.set('content-type', file.type);
+  res.set('content-disposition', 'attachment; filename="'+file.name+'"');
+  res.send(buff);
 })
 app.post('/api/rename', async function(req, res) {
   if (!await getUser(req)) {
@@ -379,4 +396,7 @@ app.use(function(req, res) {
   res.htms('pages/404.html')
 })
 
-app.listen(PORT, ()=>{console.clear();console.log('Server online at '+PORT)});
+app.listen(process.env['port'], ()=>{
+  console.clear();
+  console.log('Server online at '+process.env['port'])
+});
