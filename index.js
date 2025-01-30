@@ -17,7 +17,7 @@ const app = Express();
 const { Blob } = require('node:buffer');
 
 /* Databases */
-const { DB } = require("fshdb")
+const DB = require("fshdb")
 
 const files = new DB('./databases/files.json')
 const share = new DB('./databases/share.json')
@@ -146,7 +146,7 @@ app.get('/share', async function(req, res) {
   let buff = encrypt(Buffer.concat(buffers), usr);
   res.status(200);
   res.set('content-type', file.type);
-  res.set('content-disposition', 'attachment; filename="'+file.name+'"');
+  res.set('content-disposition', 'inline; filename="'+file.name+'"');
   res.send(buff);
 })
 
@@ -179,8 +179,16 @@ app.post('/api/upload', async function(req, res) {
     })
     return;
   }
+  if (req.body.length > 100*1024*1024) {
+    res.status(400)
+    res.json({
+      err: true,
+      msg: 'File too big'
+    })
+    return;
+  }
   let user = await getUser(req);
-  const filePartSize = 25*1024*1024;
+  const filePartSize = 10*1024*1024;
   let enc = encrypt(Buffer.from(req.body), user);
   let formData = new FormData();
   for (let i = 0; i<enc.length; i+=filePartSize) {

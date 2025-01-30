@@ -3,9 +3,9 @@
   "dependencies": {
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
-    "express": "^4.21.1",
+    "express": "^4.21.2",
     "fshdb": "^1.0.0-beta",
-    "nanoid": "^5.0.7",
+    "nanoid": "^5.0.9",
     "server-htms": "^0.2.0"
   }
 }
