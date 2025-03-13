@@ -17,10 +17,10 @@ const app = Express();
 const { Blob } = require('node:buffer');
 
 /* Databases */
-const DB = require("fshdb")
+const DB = require("fshdb");
 
-const files = new DB('./databases/files.json')
-const share = new DB('./databases/share.json')
+const files = new DB('./databases/files.json');
+const share = new DB('./databases/share.json');
 
 /* Errors */
 process.on('uncaughtException', function(err) {
@@ -96,13 +96,13 @@ app.use(function(req, res, next) {
 
 app.get('/', async function(req, res) {
   if (!await getUser(req)) {
-    res.htms('pages/login.html')
+    res.htms('pages/login.html');
   } else {
     let u = await getUser(req);
     if (!files.has(u)) {
       files.set(u, []);
     }
-    res.htms('pages/index.html')
+    res.htms('pages/index.html');
   }
 })
 app.get('/share', async function(req, res) {
@@ -119,14 +119,14 @@ app.get('/share', async function(req, res) {
     res.redirect('/');
     return;
   }
-  let usr = files.find(u=>u.filter(f=>f.channel===sh.channel&&f.message===sh.message)[0])[0];
+  let usr = files.find(u=>u.filter(f=>f.message===sh.message)[0])[0];
   if (!usr) {
     share.remove(req.query['id']);
     res.redirect('/');
     return;
   }
-  let file = files.get(usr).filter(f=>f.channel===sh.channel&&f.message===sh.message)[0];
-  let message = await fetch(`https://discord.com/api/v10/channels/${sh.channel}/messages/${sh.message}`, {
+  let file = files.get(usr).filter(f=>f.channel===(sh.channel??process.env.channel)&&f.message===sh.message)[0];
+  let message = await fetch(`https://discord.com/api/v10/channels/${(sh.channel??process.env.channel)}/messages/${sh.message}`, {
     headers: {
       authorization: 'Bot '+process.env['token']
     }
@@ -147,6 +147,7 @@ app.get('/share', async function(req, res) {
   res.status(200);
   res.set('content-type', file.type);
   res.set('content-disposition', 'inline; filename="'+file.name+'"');
+  res.setHeader('Accept-Ranges', 'none');
   res.send(buff);
 })
 
@@ -194,7 +195,7 @@ app.post('/api/upload', async function(req, res) {
   for (let i = 0; i<enc.length; i+=filePartSize) {
     formData.append('file['+(i/filePartSize)+']', new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.txt');
   }
-  let msg = await fetch(`https://discord.com/api/v10/channels/${process.env['channel']}/messages`, {
+  let msg = await fetch(`https://discord.com/api/v10/channels/${process.env.channel}/messages`, {
     method: 'POST',
     headers: {
       Authorization: 'Bot '+process.env['token']
@@ -211,8 +212,7 @@ app.post('/api/upload', async function(req, res) {
     name: req.query['name'].length ? req.query['name'] : 'file',
     type: (req.query['type'] ?? ''),
     size: req.body.length,
-    message: msg.id,
-    channel: process.env['channel']
+    message: msg.id
   })
   res.status(200);
   res.json({});
@@ -226,16 +226,16 @@ app.get('/api/download', async function(req, res) {
     })
     return;
   }
-  if (!req.query['m'] || !req.query['c']) {
+  if (!req.query['m']) {
     res.status(400)
     res.json({
       err: true,
-      msg: 'Missing identifiers'
+      msg: 'Missing identifier'
     })
     return;
   }
   let user = await getUser(req);
-  if (!files.get(user).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0]) {
+  if (!files.get(user).filter(f=>f.message===req.query['m'])[0]) {
     res.status(404);
     res.json({
       err: true,
@@ -243,7 +243,7 @@ app.get('/api/download', async function(req, res) {
     });
     return;
   }
-  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']}/messages/${req.query['m']}`, {
+  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']??process.env.channel}/messages/${req.query['m']}`, {
     headers: {
       authorization: 'Bot '+process.env['token']
     }
@@ -257,7 +257,7 @@ app.get('/api/download', async function(req, res) {
     });
     return;
   }
-  let file = files.get(user).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0];
+  let file = files.get(user).filter(f=>f.message===req.query['m'])[0];
   let buffers = [];
   for (let i = 0; i<message.attachments.length; i++) {
     let f = await fetch(message.attachments[i].url);
@@ -268,6 +268,7 @@ app.get('/api/download', async function(req, res) {
   res.status(200);
   res.set('content-type', file.type);
   res.set('content-disposition', 'attachment; filename="'+file.name+'"');
+  res.setHeader('Accept-Ranges', 'none');
   res.send(buff);
 })
 app.post('/api/rename', async function(req, res) {
@@ -279,11 +280,11 @@ app.post('/api/rename', async function(req, res) {
     })
     return;
   }
-  if (!req.query['m'] || !req.query['c']) {
+  if (!req.query['m']) {
     res.status(400)
     res.json({
       err: true,
-      msg: 'Missing identifiers'
+      msg: 'Missing identifier'
     })
     return;
   }
@@ -295,7 +296,7 @@ app.post('/api/rename', async function(req, res) {
     })
     return;
   }
-  if (!files.get(await getUser(req)).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0]) {
+  if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
     res.status(404);
     res.json({
       err: true,
@@ -305,10 +306,9 @@ app.post('/api/rename', async function(req, res) {
   }
   let user = await getUser(req);
   let f = files.get(user);
-  let c = req.query['c'];
   let m = req.query['m'];
   f = f.map(t => {
-    if (t.channel === c && t.message === m) {
+    if (t.message === m) {
       t.name = req.query['name'];
       return t;
     } else {
@@ -327,7 +327,7 @@ app.post('/api/share', async function(req, res) {
     })
     return;
   }
-  if (!req.query['m'] || !req.query['c']) {
+  if (!req.query['m']) {
     res.status(400)
     res.json({
       err: true,
@@ -335,7 +335,7 @@ app.post('/api/share', async function(req, res) {
     })
     return;
   }
-  if (!files.get(await getUser(req)).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0]) {
+  if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
     res.status(404);
     res.json({
       err: true,
@@ -343,21 +343,20 @@ app.post('/api/share', async function(req, res) {
     });
     return;
   }
-  let past = share.find(s=>s.channel===req.query['c']&&s.message===req.query['m'])[0];
+  let past = share.find(s=>s.message===req.query['m'])[0];
   if (past) {
     res.json({
       link: share.get(past).link
     })
     return;
   }
-  let id = nanoid(100);
+  let id = nanoid(80);
   let link = await fetch(`https://link.fsh.plus/create?url=${encodeURIComponent(`https://storage.fsh.plus/share?id=${id}`)}&time=0&uses=0`, { method: 'POST' });
   link = await link.json();
   share.set(id, {
     message: req.query['m'],
-    channel: req.query['c'],
     link: link.url+'+'
-  })
+  });
 
   res.json({
     link: link.url+'+'
@@ -372,7 +371,7 @@ app.post('/api/delete', async function(req, res) {
     })
     return;
   }
-  if (!req.query['m'] || !req.query['c']) {
+  if (!req.query['m']) {
     res.status(400)
     res.json({
       err: true,
@@ -380,7 +379,7 @@ app.post('/api/delete', async function(req, res) {
     })
     return;
   }
-  if (!files.get(await getUser(req)).filter(f=>f.channel===req.query['c']&&f.message===req.query['m'])[0]) {
+  if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
     res.status(404);
     res.json({
       err: true,
@@ -388,23 +387,23 @@ app.post('/api/delete', async function(req, res) {
     });
     return;
   }
-  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']}/messages/${req.query['m']}`, {
+  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']??process.env.channel}/messages/${req.query['m']}`, {
     method: 'DELETE',
     headers: {
       authorization: 'Bot '+process.env['token']
     }
   });
-  files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.channel!==req.query['c']||f.message!==req.query['m']))
+  files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.message!==req.query['m']));
   res.json({});
 })
 
 // 404
 app.use(function(req, res) {
-  res.status(404)
-  res.htms('pages/404.html')
+  res.status(404);
+  res.htms('pages/404.html');
 })
 
 app.listen(process.env['port'], ()=>{
   console.clear();
-  console.log('Server online at '+process.env['port'])
+  console.log('Server online at '+process.env['port']);
 });

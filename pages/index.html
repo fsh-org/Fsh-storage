@@ -31,6 +31,31 @@
         padding: 0;
         border: none;
       }
+
+      .upload-list {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 18vw;
+        box-shadow: var(--bg-0) 0px 0px 5px 0px;
+        border-radius: 1rem;
+        background-color: var(--bg-2);
+      }
+      .upload-list > div {
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+        padding: 5px;
+        margin: 5px;
+        border-radius: 0.6rem;
+        word-break: break-word;
+        background-color: var(--bg-3);
+      }
+      .upload-list .small {
+        color: var(--text-2);
+        font-size: 75%;
+      }
+
       .files {
         display: flex;
         flex-direction: column;
@@ -43,7 +68,7 @@
         padding: 3px;
         margin: 0px auto;
         border-radius: 0.5rem;
-        transition: background 500ms;
+        transition: background-color 500ms;
       }
       .files > div:hover {
         background-color: var(--bg-2);
@@ -69,6 +94,11 @@
         flex: 1;
         cursor: pointer;
       }
+      .media {
+        max-width: 60vw;
+        max-height: 65vh;
+        margin: 10px;
+      }
       #zone {
         display: flex;
         justify-content: center;
@@ -80,7 +110,7 @@
         padding: 4px;
         border: 0px var(--bg-2) solid;
         border-radius: 0.5rem;
-        background: 
+        background:
           linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
           linear-gradient(0deg, var(--bg-2) 50%, transparent 50%),
           linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
@@ -133,6 +163,16 @@
         .f-size {
           display: none;
         }
+        .upload-list {
+          top: unset;
+          right: 10px;
+          bottom: 10px;
+          width: 60vw;
+        }
+        .media {
+          max-width: 80vw;
+          max-height: 85vh;
+        }
       }
       .closed {
         height: 0px !important;
@@ -166,13 +206,14 @@
     </a>
     <h2 style="margin-top:-20px">Storage</h2>
     <br>
+    <div id="upload_list" class="upload-list" style="display:none"></div>
     <span id="usr-info">
       <p>Loading</p>
       <script>
         window.account.info()
           .then(d => {
             document.getElementById('usr-info').innerHTML = `<p><a href="https://account.fsh.plus" target="_blank" style="color:var(--text-1);text-decoration:none;">Hello ${d.name}!</a></p>
-<img src="${d.avatar}" width="25" height="25" style="border-radius:2rem">`
+<img src="${d.avatar}" width="25" height="25" style="border-radius:2rem">`;
           })
       </script>
     </span>
@@ -188,13 +229,15 @@
           audio: 'audio',
           other: 'span'
         }
+        let uploads = [];
+        let upload_list = document.getElementById('upload_list');
         function previewFile(text, direct, pointer) {
           let dialog = document.getElementById('preview');
           dialog.showModal();
           let type = pointer.type.split('/')[0];
           if (!Object.keys(typeToElement).includes(type)) type = 'other';
           dialog.innerHTML = `${text}
-<${typeToElement[type]} controls src="${direct ? URL.createObjectURL(pointer) : pointer.url}" style="max-width:60vw;max-height:65vh;margin:10px;"></${typeToElement[type]}>`
+<${typeToElement[type]} controls src="${direct ? URL.createObjectURL(pointer) : pointer.url}" class="media"></${typeToElement[type]}>`;
         }
         function uploadFile(file) {
           return new Promise((resolve, reject) => {
@@ -203,8 +246,14 @@
               reject();
               return;
             }
-            previewFile('<p>Uploading...</p>', true, file)
-            fetch('/api/upload?name='+file.name+'&type='+file.type, {
+            let id = 'up-'+Math.floor(Math.random()*100000);
+            uploads.push(id);
+            upload_list.style.display = '';
+            upload_list.insertAdjacentHTML('beforeend', `<div id="${id}">
+  <span>${file.name} - <sapn class="status">Uploading</span></span>
+  <span class="small">${formatBytes(file.size)} · ${file.type}</span>
+</div>`);
+            fetch(`/api/upload?name=${file.name}&type=${file.type}`, {
               method: 'POST',
               headers: {
                 'content-type': 'application/octet-stream'
@@ -212,11 +261,15 @@
               body: file
             })
               .then(res => {
+                uploads = uploads.filter(f=>f!==id);
+                document.getElementById(id).remove();
+                if (uploads.lenth<1) upload_list.style.display = 'none';
                 setFiles();
                 resolve()
               })
               .catch(err => {
-                document.getElementById('preview').innerHTML = '<p>Error: '+err+'</p>';
+                document.querySelector(`#${id} .status`).innerText = 'Failed';
+                document.querySelector(`#${id} .status`).style.color = 'var(--red-1)';
                 reject();
               })
           });
@@ -247,19 +300,19 @@
           event.stopPropagation();
           event.preventDefault();
           if (show) {
-            zone.classList.remove('closed')
+            zone.classList.remove('closed');
             if (hover) {
-              zone.classList.add('hover')
+              zone.classList.add('hover');
             } else {
-              zone.classList.remove('hover')
+              zone.classList.remove('hover');
             }
           } else {
-            zone.classList.add('closed')
+            zone.classList.add('closed');
           }
         }
 
         document.getElementById("up").onchange = function() {
-          uploadMultiple(Array.from(this.files))
+          uploadMultiple(Array.from(this.files));
         };
       </script>
     </div>
@@ -282,18 +335,18 @@
       function view(m, c, t) {
         previewFile('<button onclick="this.parentElement.close()" class="modal-close">x</button>', false, {
           type: t,
-          url: 'https://storage.fsh.plus/api/download?m='+m+'&c='+c
+          url: `https://storage.fsh.plus/api/download?m=${m}${c?'&c='+c:''}`
         })
       }
       function rename(m, c, n) {
         if (n===null) return;
-        fetch('/api/rename?m='+m+'&c='+c+'&name='+n, { method: 'POST' })
+        fetch(`/api/rename?m=${m}${c?'&c='+c:''}&name=${n}`, { method: 'POST' })
           .then(async nam => {
             setFiles();
           })
       }
       function share(m, c) {
-        fetch('/api/share?m='+m+'&c='+c, { method: 'POST' })
+        fetch(`/api/share?m=${m}${c?'&c='+c:''}`, { method: 'POST' })
           .then(async sha => {
             sha = await sha.json();
             navigator.clipboard.writeText(sha.link);
@@ -308,10 +361,10 @@
           })
       }
       function download(m, c) {
-        window.open('https://storage.fsh.plus/api/download?m='+m+'&c='+c)
+        window.open(`https://storage.fsh.plus/api/download?m=${m}${c?'&c='+c:''}`)
       }
       function remove(m, c) {
-        fetch('/api/delete?m='+m+'&c='+c, { method: 'POST' })
+        fetch(`/api/delete?m=${m}${c?'&c='+c:''}`, { method: 'POST' })
           .then(async del => {
             setFiles();
           })
@@ -371,15 +424,15 @@
             let num = 1;
             res.forEach(f => {
                 document.querySelector('.files').insertAdjacentHTML('beforeend', `<div>
-  <p class="f-name" onclick="view('${f.message}', '${f.channel}', '${f.type}')">${f.name}</p>
+  <p class="f-name" onclick="view('${f.message}', '${f.channel??''}', '${f.type}')">${f.name}</p>
   <p class="f-size">${formatBytes(f.size)}</p>
   <button id="o${num}"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256"><path fill-rule="evenodd" clip-rule="evenodd" d="M104 33.5C104 20.5213 114.521 10 127.5 10C140.479 10 151 20.5213 151 33.5C151 46.4787 140.479 57 127.5 57C114.521 57 104 46.4787 104 33.5ZM104 127.5C104 114.521 114.521 104 127.5 104C140.479 104 151 114.521 151 127.5C151 140.479 140.479 151 127.5 151C114.521 151 104 140.479 104 127.5ZM127.5 198C114.521 198 104 208.521 104 221.5C104 234.479 114.521 245 127.5 245C140.479 245 151 234.479 151 221.5C151 208.521 140.479 198 127.5 198Z"/></svg></button>
 </div>`)
                 tippy(document.getElementById('o'+num), {
-                  content: `<button onclick="rename('${f.message}', '${f.channel}', prompt('New name', '${f.name}'))">Rename</button>
-<button onclick="share('${f.message}', '${f.channel}')">Share</button>
-<button onclick="download('${f.message}', '${f.channel}')">Download</button>
-<button class="danger" onclick="remove('${f.message}', '${f.channel}')">Delete</button>`,
+                  content: `<button onclick="rename('${f.message}', '${f.channel??''}', prompt('New name', '${f.name}'))">Rename</button>
+<button onclick="share('${f.message}', '${f.channel??''}')">Share</button>
+<button onclick="download('${f.message}', '${f.channel??''}')">Download</button>
+<button class="danger" onclick="remove('${f.message}', '${f.channel??''}')">Delete</button>`,
                   allowHTML: true,
                   sticky: true,
                   interactive: true,
