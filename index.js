@@ -125,7 +125,7 @@ app.get('/share', async function(req, res) {
     res.redirect('/');
     return;
   }
-  let file = files.get(usr).filter(f=>f.channel===(sh.channel??process.env.channel)&&f.message===sh.message)[0];
+  let file = files.get(usr).filter(f=>f.message===sh.message)[0];
   let message = await fetch(`https://discord.com/api/v10/channels/${(sh.channel??process.env.channel)}/messages/${sh.message}`, {
     headers: {
       authorization: 'Bot '+process.env['token']
@@ -137,18 +137,20 @@ app.get('/share', async function(req, res) {
     res.redirect('/');
     return;
   }
-  let buffers = [];
+
+  res.status(200);
+  res.set('Content-Type', file.type);
+  res.set('Transfer-Encoding', 'chunked');
+  res.set('Accept-Ranges', 'none');
+  res.set('Content-Disposition', `inline; filename="${file.name}"`);
+
   for (let i = 0; i<message.attachments.length; i++) {
     let f = await fetch(message.attachments[i].url);
-    f = await f.arrayBuffer();
-    buffers.push(Buffer.from(f));
+    for await (const chunk of f.body) {
+      res.write(encrypt(chunk, usr));
+    }
   }
-  let buff = encrypt(Buffer.concat(buffers), usr);
-  res.status(200);
-  res.set('content-type', file.type);
-  res.set('content-disposition', 'inline; filename="'+file.name+'"');
-  res.setHeader('Accept-Ranges', 'none');
-  res.send(buff);
+  res.end();
 })
 
 /* API */
@@ -193,7 +195,7 @@ app.post('/api/upload', async function(req, res) {
   let enc = encrypt(Buffer.from(req.body), user);
   let formData = new FormData();
   for (let i = 0; i<enc.length; i+=filePartSize) {
-    formData.append('file['+(i/filePartSize)+']', new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.txt');
+    formData.append(`file[${i/filePartSize}]`, new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.bin');
   }
   let msg = await fetch(`https://discord.com/api/v10/channels/${process.env.channel}/messages`, {
     method: 'POST',
@@ -201,7 +203,7 @@ app.post('/api/upload', async function(req, res) {
       Authorization: 'Bot '+process.env['token']
     },
     body: formData
-  })
+  });
   msg = await msg.json();
   if (!msg.id) {
     res.status(400);
@@ -258,18 +260,20 @@ app.get('/api/download', async function(req, res) {
     return;
   }
   let file = files.get(user).filter(f=>f.message===req.query['m'])[0];
-  let buffers = [];
+
+  res.status(200);
+  res.set('Content-Type', file.type);
+  res.set('Transfer-Encoding', 'chunked');
+  res.set('Accept-Ranges', 'none');
+  res.set('Content-Disposition', `attachment; filename="${file.name}"`);
+
   for (let i = 0; i<message.attachments.length; i++) {
     let f = await fetch(message.attachments[i].url);
-    f = await f.arrayBuffer();
-    buffers.push(Buffer.from(f));
+    for await (const chunk of f.body) {
+      res.write(encrypt(chunk, user));
+    }
   }
-  let buff = encrypt(Buffer.concat(buffers), user);
-  res.status(200);
-  res.set('content-type', file.type);
-  res.set('content-disposition', 'attachment; filename="'+file.name+'"');
-  res.setHeader('Accept-Ranges', 'none');
-  res.send(buff);
+  res.end();
 })
 app.post('/api/rename', async function(req, res) {
   if (!await getUser(req)) {
@@ -350,13 +354,15 @@ app.post('/api/share', async function(req, res) {
     })
     return;
   }
-  let id = nanoid(80);
+  let id = nanoid(60);
   let link = await fetch(`https://link.fsh.plus/create?url=${encodeURIComponent(`https://storage.fsh.plus/share?id=${id}`)}&time=0&uses=0`, { method: 'POST' });
   link = await link.json();
-  share.set(id, {
+  let data = {
     message: req.query['m'],
     link: link.url+'+'
-  });
+  };
+  if (req.query['c']) data.channel = req.query['c'];
+  share.set(id, data);
 
   res.json({
     link: link.url+'+'
