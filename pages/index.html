@@ -227,6 +227,8 @@
           image: 'img',
           video: 'video',
           audio: 'audio',
+          text: 'iframe',
+          application: 'iframe',
           other: 'span'
         }
         let uploads = [];
@@ -237,7 +239,15 @@
           let type = pointer.type.split('/')[0];
           if (!Object.keys(typeToElement).includes(type)) type = 'other';
           dialog.innerHTML = `${text}
-<${typeToElement[type]} controls src="${direct ? URL.createObjectURL(pointer) : pointer.url}" class="media"></${typeToElement[type]}>`;
+<${typeToElement[type]} controls sandbox src="${direct ? URL.createObjectURL(pointer) : pointer.url}" class="media"></${typeToElement[type]}>`;
+          if (type === 'text' || pointer.type === 'application/json') {
+            let im = document.querySelector('iframe.media');
+            fetch(im.src)
+              .then(res=>res.blob())
+              .then(res=>{
+                im.src = URL.createObjectURL(res);
+              })
+          }
         }
         function uploadFile(file) {
           return new Promise((resolve, reject) => {
@@ -265,7 +275,7 @@
                 document.getElementById(id).remove();
                 if (uploads.lenth<1) upload_list.style.display = 'none';
                 setFiles();
-                resolve()
+                resolve();
               })
               .catch(err => {
                 document.querySelector(`#${id} .status`).innerText = 'Failed';
@@ -328,7 +338,7 @@
         bytes = Number(bytes);
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        const sizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB','RiB','QiB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       }

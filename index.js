@@ -80,7 +80,7 @@ app.use(function(req, res, next) {
         re = eval(match.replace('{{','').replace('}}','').trim());
       } catch (err) {
         re = 'Error';
-        console.log('Err: '+err)
+        console.log('Err: ', err)
       }
       return re;
     })
@@ -89,7 +89,7 @@ app.use(function(req, res, next) {
     if (typeof arguments[0] === 'string') {
       arguments[0] = mod(arguments[0]);
     }
-    orig.apply(res, arguments)
+    orig.apply(res, arguments);
   };
   next();
 })
@@ -160,10 +160,10 @@ app.get('/api/files', async function(req, res) {
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
-  res.json(files.get(await getUser(req)))
+  res.json(files.get(await getUser(req)));
 })
 app.post('/api/upload', async function(req, res) {
   if (!await getUser(req)) {
@@ -171,7 +171,7 @@ app.post('/api/upload', async function(req, res) {
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
   if (!req.body) {
@@ -179,20 +179,31 @@ app.post('/api/upload', async function(req, res) {
     res.json({
       err: true,
       msg: 'Include file'
-    })
+    });
     return;
   }
   if (req.body.length > 100*1024*1024) {
-    res.status(400)
+    res.status(400);
     res.json({
       err: true,
       msg: 'File too big'
-    })
+    });
     return;
   }
   let user = await getUser(req);
   const filePartSize = 10*1024*1024;
-  let enc = encrypt(Buffer.from(req.body), user);
+  let buf;
+  try {
+    buf = Buffer.from(req.body);
+  } catch(err) {
+    res.status(400);
+    res.json({
+      err: true,
+      msg: 'Invalid file content'
+    });
+    return;
+  }
+  let enc = encrypt(buf, user);
   let formData = new FormData();
   for (let i = 0; i<enc.length; i+=filePartSize) {
     formData.append(`file[${i/filePartSize}]`, new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.bin');
@@ -225,7 +236,7 @@ app.get('/api/download', async function(req, res) {
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
   if (!req.query['m']) {
@@ -233,7 +244,7 @@ app.get('/api/download', async function(req, res) {
     res.json({
       err: true,
       msg: 'Missing identifier'
-    })
+    });
     return;
   }
   let user = await getUser(req);
