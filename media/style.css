@@ -1,0 +1,180 @@
+body {
+  text-align: center;
+}
+#usr-info {
+  display: flex;
+  justify-content: center;
+}
+.modal-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+}
+
+.upload-list {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 18vw;
+  box-shadow: var(--bg-0) 0px 0px 5px 0px;
+  border-radius: 1rem;
+  background-color: var(--bg-2);
+}
+.upload-list > div {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 5px;
+  margin: 5px;
+  border-radius: 0.6rem;
+  word-break: break-word;
+  background-color: var(--bg-3);
+}
+.upload-list .small {
+  color: var(--text-2);
+  font-size: 75%;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+}
+.files > div {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  width: 60vw;
+  padding: 3px;
+  margin: 0px auto;
+  border-radius: 0.5rem;
+  transition: background-color 500ms;
+}
+.files > div:hover {
+  background-color: var(--bg-2);
+}
+.files p {
+  display: flex;
+  text-align: left;
+  word-break: break-word;
+}
+.files > div > button {
+  padding: 2px;
+  border: none;
+}
+.danger {
+  color: #f66;
+  border: 2px #f66 solid;
+}
+.danger:hover {
+  color: var(--bg-1);
+  background-color: #f66;
+}
+.f-name {
+  flex: 1;
+  cursor: pointer;
+}
+.media {
+  max-width: 60vw;
+  max-height: 65vh;
+  margin: 10px;
+}
+#zone {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 10vh;
+  width: 40vw;
+  box-sizing: border-box;
+  margin: 5px auto;
+  padding: 4px;
+  border: 0px var(--bg-2) solid;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
+    linear-gradient(0deg, var(--bg-2) 50%, transparent 50%),
+    linear-gradient(90deg, var(--bg-2) 50%, transparent 50%),
+    linear-gradient(0deg, var(--bg-2) 50%, transparent 50%);
+  background-repeat: repeat-x, repeat-y, repeat-x, repeat-y;
+  background-size: 15px 4px, 4px 15px, 15px 4px, 4px 15px;
+  background-position: left top, right top, left bottom, left top;
+  animation: border-dance 4s infinite linear;
+  transition: all 500ms ease-in-out;
+}
+#zone.hover {
+  border: 2px var(--bg-3) solid;
+  background: var(--bg-2);
+  animation: none;
+}
+pre {
+  width: fit-content;
+  margin: 10px auto 0px;
+  padding: 10px;
+  border-radius: 1rem;
+  cursor: pointer;
+  background-color: var(--bg-0);
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60vw;
+  margin: 0px auto 4px;
+}
+.head span {
+  flex: 1;
+}
+.head button {
+  display: flex;
+  align-items: center;
+}
+.head button.discrete {
+  margin: 0px 5px;
+  border: none;
+}
+@keyframes border-dance {
+  0% {
+    background-position: left top, right top, right bottom, left bottom;
+  }
+  100% {
+    background-position: right top, right bottom, left bottom, left top;
+  }
+}
+@media (max-width: 700px) {
+  .files > div, .head, #zone {
+    width: 90vw;
+  }
+  .f-size {
+    display: none;
+  }
+  .upload-list {
+    top: unset;
+    right: 10px;
+    bottom: 10px;
+    width: 60vw;
+  }
+  .media {
+    max-width: 80vw;
+    max-height: 85vh;
+  }
+}
+.closed {
+  height: 0px !important;
+  margin: 0px auto !important;
+  opacity: 0;
+}
+.tippy-box {
+  background-color: var(--bg-2);
+  color: var(--text-1);
+}
+.tippy-content {
+  display: flex;
+  gap: 2px;
+  flex-direction: column;
+}
+.tippy-arrow {
+  color: var(--bg-2);
+}

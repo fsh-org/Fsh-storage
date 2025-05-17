@@ -70,7 +70,7 @@ app.use(bodyParser.raw({
 app.use(bodyParser.json({
   limit: '100mb'
 }));
-app.use(htms)
+app.use(htms);
 app.use(function(req, res, next) {
   let orig = res.send;
   function mod(text) {
@@ -92,7 +92,9 @@ app.use(function(req, res, next) {
     orig.apply(res, arguments);
   };
   next();
-})
+});
+
+app.use('/media', Express.static('media'));
 
 app.get('/', async function(req, res) {
   if (!await getUser(req)) {
