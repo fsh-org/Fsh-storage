@@ -14,6 +14,9 @@ body {
   padding: 0;
   border: none;
 }
+input[inert] {
+  opacity: 0;
+}
 
 .upload-list {
   position: absolute;
