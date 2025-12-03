@@ -1,5 +1,5 @@
 /* Require */
-let process = require('process');
+let process = require('node:process');
 process.env = require('./env.js'); // hacky implementation
 
 let nanoid;
@@ -11,6 +11,7 @@ let nanoid;
 const Express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const path = require('node:path');
 const htms = require('server-htms');
 const app = Express();
 
@@ -96,6 +97,9 @@ app.use(function(req, res, next) {
 
 app.use('/media', Express.static('media'));
 
+app.get('/favicon.ico', async function(req, res) {
+  res.sendFile(path.join(__dirname, 'pages/favicon.ico'));
+});
 app.get('/', async function(req, res) {
   if (!await getUser(req)) {
     res.htms('pages/login.html');
@@ -106,7 +110,7 @@ app.get('/', async function(req, res) {
     }
     res.htms('pages/index.html');
   }
-})
+});
 app.get('/share', async function(req, res) {
   if (!req.query['id']) {
     res.redirect('/');
@@ -153,7 +157,7 @@ app.get('/share', async function(req, res) {
     }
   }
   res.end();
-})
+});
 
 /* API */
 app.get('/api/files', async function(req, res) {
@@ -166,7 +170,7 @@ app.get('/api/files', async function(req, res) {
     return;
   }
   res.json(files.get(await getUser(req)));
-})
+});
 app.post('/api/upload', async function(req, res) {
   if (!await getUser(req)) {
     res.status(401)
@@ -231,7 +235,7 @@ app.post('/api/upload', async function(req, res) {
   })
   res.status(200);
   res.json({});
-})
+});
 app.get('/api/download', async function(req, res) {
   if (!await getUser(req)) {
     res.status(401)
@@ -287,30 +291,30 @@ app.get('/api/download', async function(req, res) {
     }
   }
   res.end();
-})
+});
 app.post('/api/rename', async function(req, res) {
   if (!await getUser(req)) {
-    res.status(401)
+    res.status(401);
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
   if (!req.query['m']) {
-    res.status(400)
+    res.status(400);
     res.json({
       err: true,
       msg: 'Missing identifier'
-    })
+    });
     return;
   }
   if (!req.query['name']) {
-    res.status(400)
+    res.status(400);
     res.json({
       err: true,
       msg: 'Missing name'
-    })
+    });
     return;
   }
   if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
@@ -327,29 +331,27 @@ app.post('/api/rename', async function(req, res) {
   f = f.map(t => {
     if (t.message === m) {
       t.name = req.query['name'];
-      return t;
-    } else {
-      return t;
     }
+    return t;
   })
   files.set(user, f);
-  res.json({})
-})
+  res.json({});
+});
 app.post('/api/share', async function(req, res) {
   if (!await getUser(req)) {
-    res.status(401)
+    res.status(401);
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
   if (!req.query['m']) {
-    res.status(400)
+    res.status(400);
     res.json({
       err: true,
       msg: 'Missing identifiers'
-    })
+    });
     return;
   }
   if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
@@ -364,7 +366,7 @@ app.post('/api/share', async function(req, res) {
   if (past) {
     res.json({
       link: share.get(past).link
-    })
+    });
     return;
   }
   let id = nanoid(60);
@@ -379,23 +381,23 @@ app.post('/api/share', async function(req, res) {
 
   res.json({
     link: link.url+'+'
-  })
-})
+  });
+});
 app.post('/api/delete', async function(req, res) {
   if (!await getUser(req)) {
-    res.status(401)
+    res.status(401);
     res.json({
       err: true,
       msg: 'Not logged in'
-    })
+    });
     return;
   }
   if (!req.query['m']) {
-    res.status(400)
+    res.status(400);
     res.json({
       err: true,
       msg: 'Missing identifiers'
-    })
+    });
     return;
   }
   if (!files.get(await getUser(req)).filter(f=>f.message===req.query['m'])[0]) {
@@ -414,13 +416,13 @@ app.post('/api/delete', async function(req, res) {
   });
   files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.message!==req.query['m']));
   res.json({});
-})
+});
 
 // 404
 app.use(function(req, res) {
   res.status(404);
   res.htms('pages/404.html');
-})
+});
 
 app.listen(process.env['port'], ()=>{
   console.clear();
