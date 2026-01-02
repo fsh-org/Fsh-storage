@@ -104,18 +104,27 @@
               },
               body: file
             })
-              .then(() => {
+              .then(res=>{
+                if (!res.ok) throw new Error('Not ok');
+                return res.text();
+              })
+              .then(()=>{
                 uploads = uploads.filter(f=>f!==id);
                 document.getElementById(id).remove();
                 if (uploads.lenth<1) upload_list.style.display = 'none';
                 fetchFiles();
                 resolve();
               })
-              .catch(err => {
+              .catch(err=>{
                 document.querySelector(`#${id} .status`).innerText = 'Failed';
                 document.querySelector(`#${id} .status`).style.color = 'var(--red-1)';
+                setTimeout(()=>{
+                  uploads = uploads.filter(f=>f!==id);
+                  document.getElementById(id).remove();
+                  if (uploads.lenth<1) upload_list.style.display = 'none';
+                }, 10*1000); // 10sec
                 reject();
-              })
+              });
           });
         }
         function uploadMultiple(files) {

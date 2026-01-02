@@ -189,7 +189,7 @@ app.post('/api/upload', async function(req, res) {
     return;
   }
   if (req.body.length > 100*1024*1024) {
-    res.status(400);
+    res.status(413);
     res.json({
       err: true,
       msg: 'File too big'
@@ -214,17 +214,30 @@ app.post('/api/upload', async function(req, res) {
   for (let i = 0; i<enc.length; i+=filePartSize) {
     formData.append(`file[${i/filePartSize}]`, new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.bin');
   }
-  let msg = await fetch(`https://discord.com/api/v10/channels/${process.env.channel}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: 'Bot '+process.env['token']
-    },
-    body: formData
-  });
-  msg = await msg.json();
+  let msg;
+  try {
+    msg = await fetch(`https://discord.com/api/v10/channels/${process.env.channel}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bot '+process.env['token']
+      },
+      body: formData
+    });
+    msg = await msg.json();
+  } catch(err) {
+    res.status(500);
+    res.json({
+      err: true,
+      msg: 'Could not upload'
+    });
+    return;
+  }
   if (!msg.id) {
-    res.status(400);
-    res.json({});
+    res.status(500);
+    res.json({
+      err: true,
+      msg: 'No file reference'
+    });
     return;
   }
   files.push(user, {
@@ -232,7 +245,7 @@ app.post('/api/upload', async function(req, res) {
     type: (req.query['type'] ?? ''),
     size: req.body.length,
     message: msg.id
-  })
+  });
   res.status(200);
   res.json({});
 });
