@@ -132,12 +132,19 @@ app.get('/share', async function(req, res) {
     return;
   }
   let file = files.get(usr).filter(f=>f.message===sh.message)[0];
-  let message = await fetch(`https://discord.com/api/v10/channels/${(sh.channel??process.env.channel)}/messages/${sh.message}`, {
-    headers: {
-      authorization: 'Bot '+process.env['token']
-    }
-  });
-  message = await message.json();
+  let message;
+  try {
+    message = await fetch(`https://discord.com/api/v10/channels/${(sh.channel??process.env.channel)}/messages/${sh.message}`, {
+      headers: {
+        authorization: 'Bot '+process.env['token']
+      }
+    });
+    message = await message.json();
+  } catch(err) {
+    share.remove(req.query['id']);
+    res.redirect('/');
+    return;
+  }
   if (!message) {
     share.remove(req.query['id']);
     res.redirect('/');
