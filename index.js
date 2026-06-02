@@ -23,6 +23,10 @@ const DB = require("fshdb");
 const files = new DB('./databases/files.json');
 const share = new DB('./databases/share.json');
 
+const MaxSize = 100*1024*1024;
+const MaxSizeStr = '100mb';
+const ChunkSize = 10*1024*1024;
+
 /* Errors */
 process.on('uncaughtException', function(err) {
   console.log('Error!');
@@ -58,18 +62,28 @@ function encrypt(file, id) {
   }
   return file;
 }
+async function getMessage(chid, msgid, action='GET') {
+  let message = await fetch(`https://discord.com/api/v10/channels/${chid}/messages/${msgid}`, {
+    method: action,
+    headers: {
+      authorization: 'Bot '+process.env['token']
+    }
+  });
+  if (action==='GET') message = await message.json()
+  return message;
+}
 
 app.use(cors());
 app.use(bodyParser.urlencoded({
   extended: true,
-  limit: '100mb'
+  limit: MaxSizeStr
 }));
 app.use(bodyParser.raw({
   type: '*/*',
-  limit: '100mb'
+  limit: MaxSizeStr
 }));
 app.use(bodyParser.json({
-  limit: '100mb'
+  limit: MaxSizeStr
 }));
 app.use(htms);
 app.use(function(req, res, next) {
@@ -134,12 +148,7 @@ app.get('/share', async function(req, res) {
   let file = files.get(usr).filter(f=>f.message===sh.message)[0];
   let message;
   try {
-    message = await fetch(`https://discord.com/api/v10/channels/${(sh.channel??process.env.channel)}/messages/${sh.message}`, {
-      headers: {
-        authorization: 'Bot '+process.env['token']
-      }
-    });
-    message = await message.json();
+    message = await getMessage((sh.channel??process.env.channel), sh.message);
   } catch(err) {
     share.remove(req.query['id']);
     res.redirect('/');
@@ -195,7 +204,7 @@ app.post('/api/upload', async function(req, res) {
     });
     return;
   }
-  if (req.body.length > 100*1024*1024) {
+  if (req.body.length > MaxSize) {
     res.status(413);
     res.json({
       err: true,
@@ -204,7 +213,6 @@ app.post('/api/upload', async function(req, res) {
     return;
   }
   let user = await getUser(req);
-  const filePartSize = 10*1024*1024;
   let buf;
   try {
     buf = Buffer.from(req.body);
@@ -218,8 +226,8 @@ app.post('/api/upload', async function(req, res) {
   }
   let enc = encrypt(buf, user);
   let formData = new FormData();
-  for (let i = 0; i<enc.length; i+=filePartSize) {
-    formData.append(`file[${i/filePartSize}]`, new Blob([enc.slice(i, i+filePartSize)], { type: 'text/plain' }), 'file.bin');
+  for (let i = 0; i<enc.length; i+=ChunkSize) {
+    formData.append(`file[${i/ChunkSize}]`, new Blob([enc.slice(i, i+ChunkSize)], { type: 'text/plain' }), 'file.bin');
   }
   let msg;
   try {
@@ -282,12 +290,7 @@ app.get('/api/download', async function(req, res) {
     });
     return;
   }
-  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']??process.env.channel}/messages/${req.query['m']}`, {
-    headers: {
-      authorization: 'Bot '+process.env['token']
-    }
-  });
-  message = await message.json();
+  let message = await getMessage(req.query['c']??process.env.channel, req.query['m']);
   if (!message) {
     res.status(404);
     res.json({
@@ -298,16 +301,59 @@ app.get('/api/download', async function(req, res) {
   }
   let file = files.get(user).filter(f=>f.message===req.query['m'])[0];
 
-  res.status(200);
   res.set('Content-Type', file.type);
-  res.set('Transfer-Encoding', 'chunked');
-  res.set('Accept-Ranges', 'none');
+  res.set('Accept-Ranges', 'bytes');
   res.set('Content-Disposition', `attachment; filename="${file.name}"`);
 
-  for (let i = 0; i<message.attachments.length; i++) {
+  let range = [0, message.attachments.length];
+  let byteRange = [0, file.size];
+  if (req.headers.range&&(/^bytes=[0-9]*?-[0-9]*?$/).test(req.headers.range)) {
+    let match = req.headers.range.match(/^bytes=([0-9]*?)-([0-9]*?)$/);
+    if (match[1]) {
+      byteRange[0] = Number(match[1]);
+      range[0] = Math.floor(byteRange[0]/ChunkSize);
+    }
+    if (match[2]) {
+      byteRange[1] = Math.min(Number(match[2])+1, file.size);
+      range[1] = Math.min(Math.floor((byteRange[1]-1)/ChunkSize)+1, message.attachments.length);
+    }
+  }
+
+  if (range[0]!==0||range[1]!==message.attachments.length) {
+    res.status(206);
+    res.set('Content-Length', byteRange[1]-byteRange[0]);
+    res.set('Content-Range', `bytes ${byteRange[0]}-${byteRange[1]-1}/${file.size}`);
+  } else {
+    res.status(200);
+    res.set('Content-Length', file.size);
+  }
+
+  for (let i = range[0]; i<range[1]; i++) {
     let f = await fetch(message.attachments[i].url);
+    let size = 0;
+    let stcut = i!==range[0];
     for await (const chunk of f.body) {
-      res.write(encrypt(chunk, user));
+      let data = encrypt(chunk, user);
+      if (i===range[0]&&byteRange[0]%ChunkSize!==0) {
+        if (size+data.length<=byteRange[0]%ChunkSize) {
+          size += data.length;
+          continue;
+        }
+        if (size+data.length>byteRange[0]%ChunkSize&&!stcut) {
+          stcut = true;
+          data = data.slice(byteRange[0]%ChunkSize-size);
+        }
+      }
+      if (i===range[1]-1&&byteRange[1]%ChunkSize!==0) {
+        if (size+data.length>byteRange[1]%ChunkSize) {
+          data = data.slice(0, byteRange[1]%ChunkSize-size);
+          res.write(data);
+          res.end();
+          return;
+        }
+      }
+      size += data.length;
+      res.write(data);
     }
   }
   res.end();
@@ -428,12 +474,7 @@ app.post('/api/delete', async function(req, res) {
     });
     return;
   }
-  let message = await fetch(`https://discord.com/api/v10/channels/${req.query['c']??process.env.channel}/messages/${req.query['m']}`, {
-    method: 'DELETE',
-    headers: {
-      authorization: 'Bot '+process.env['token']
-    }
-  });
+  let message = await getMessage(req.query['c']??process.env.channel, req.query['m'], 'DELETE');
   files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.message!==req.query['m']));
   res.json({});
 });
