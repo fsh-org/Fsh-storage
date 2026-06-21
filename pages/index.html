@@ -80,13 +80,13 @@
               .then(res=>res.blob())
               .then(res=>{
                 im.src = URL.createObjectURL(res);
-              })
+              });
           }
         }
         function uploadFile(file) {
           return new Promise((resolve, reject) => {
             if(file.size > 100 * 1024 * 1024) {
-              alert("File too big (max 100MB)");
+              alert('File too big (max 100MB)');
               reject();
               return;
             }
@@ -164,7 +164,7 @@
           }
         }
 
-        document.getElementById("up").onchange = function() {
+        document.getElementById('up').onchange = function() {
           uploadMultiple(Array.from(this.files));
         };
       </script>

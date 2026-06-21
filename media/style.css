@@ -22,7 +22,7 @@ input[inert] {
   position: absolute;
   top: 20px;
   right: 20px;
-  width: 18vw;
+  width: 18dvw;
   box-shadow: var(--bg-0) 0px 0px 5px 0px;
   border-radius: 1rem;
   background-color: var(--bg-2);
@@ -50,7 +50,7 @@ input[inert] {
   display: flex;
   gap: 5px;
   align-items: center;
-  width: 60vw;
+  width: 60dvw;
   padding: 3px;
   margin: 0px auto;
   border-radius: 0.5rem;
@@ -81,16 +81,19 @@ input[inert] {
   cursor: pointer;
 }
 .media {
-  max-width: 60vw;
-  max-height: 65vh;
+  max-width: 60dvw;
+  max-height: 65dvh;
   margin: 10px;
+}
+audio.media {
+  width: 30dvw;
 }
 #zone {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 10vh;
-  width: 40vw;
+  height: 10dvh;
+  width: 40dvw;
   box-sizing: border-box;
   margin: 5px auto;
   padding: 4px;
@@ -124,7 +127,7 @@ pre {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60vw;
+  width: 60dvw;
   margin: 0px auto 4px;
 }
 .head span {
@@ -148,7 +151,7 @@ pre {
 }
 @media (max-width: 700px) {
   .files > div, .head, #zone {
-    width: 90vw;
+    width: 90dvw;
   }
   .f-size {
     display: none;
@@ -157,11 +160,14 @@ pre {
     top: unset;
     right: 10px;
     bottom: 10px;
-    width: 60vw;
+    width: 60dvw;
   }
   .media {
-    max-width: 80vw;
-    max-height: 85vh;
+    max-width: 80dvw;
+    max-height: 85dvh;
+  }
+  audio.media {
+    width: 60dvw;
   }
 }
 .closed {

@@ -12,13 +12,12 @@ const Express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('node:path');
-const htms = require('server-htms');
 const app = Express();
 
 const { Blob } = require('node:buffer');
 
 /* Databases */
-const DB = require("fshdb");
+const DB = require('fshdb');
 
 const files = new DB('./databases/files.json');
 const share = new DB('./databases/share.json');
@@ -85,29 +84,6 @@ app.use(bodyParser.raw({
 app.use(bodyParser.json({
   limit: MaxSizeStr
 }));
-app.use(htms);
-app.use(function(req, res, next) {
-  let orig = res.send;
-  function mod(text) {
-    return text.replace(/\{\{[^¬]+?\}\}/g, function(match){
-      let re;
-      try {
-        re = eval(match.replace('{{','').replace('}}','').trim());
-      } catch (err) {
-        re = 'Error';
-        console.log('Err: ', err)
-      }
-      return re;
-    })
-  }
-  res.send = function(){
-    if (typeof arguments[0] === 'string') {
-      arguments[0] = mod(arguments[0]);
-    }
-    orig.apply(res, arguments);
-  };
-  next();
-});
 
 app.use('/media', Express.static('media'));
 
@@ -116,13 +92,13 @@ app.get('/favicon.ico', async function(req, res) {
 });
 app.get('/', async function(req, res) {
   if (!await getUser(req)) {
-    res.htms('pages/login.html');
+    res.sendFile(path.join(__dirname, 'pages/login.html'));
   } else {
     let u = await getUser(req);
     if (!files.has(u)) {
       files.set(u, []);
     }
-    res.htms('pages/index.html');
+    res.sendFile(path.join(__dirname, 'pages/index.html'));
   }
 });
 app.get('/share', async function(req, res) {
@@ -259,6 +235,7 @@ app.post('/api/upload', async function(req, res) {
     name: req.query['name'].length ? req.query['name'] : 'file',
     type: (req.query['type'] ?? ''),
     size: req.body.length,
+    chunkSize: ChunkSize,
     message: msg.id
   });
   res.status(200);
@@ -311,15 +288,27 @@ app.get('/api/download', async function(req, res) {
     let match = req.headers.range.match(/^bytes=([0-9]*?)-([0-9]*?)$/);
     if (match[1]) {
       byteRange[0] = Number(match[1]);
-      range[0] = Math.floor(byteRange[0]/ChunkSize);
+    } else if (match[2]) { // Suffix
+      byteRange[0] = Math.max(0, file.size-Number(match[2]));
+      match[2] = '';
     }
-    if (match[2]) {
-      byteRange[1] = Math.min(Number(match[2])+1, file.size);
-      range[1] = Math.min(Math.floor((byteRange[1]-1)/ChunkSize)+1, message.attachments.length);
+    if (match[2]) byteRange[1] = Math.min(Number(match[2])+1, file.size);
+    // Validation
+    if (byteRange[0]>=file.size||byteRange[0]>=byteRange[1]) {
+      res.status(416);
+      res.set('Content-Range', `bytes */${file.size}`);
+      res.json({
+        err: true,
+        msg: 'Range not satisfiable'
+      });
+      return;
     }
+    // Message range
+    range[0] = Math.floor(byteRange[0]/file.chunkSize);
+    range[1] = Math.min(Math.floor((byteRange[1]-1)/file.chunkSize)+1, message.attachments.length);
   }
 
-  if (range[0]!==0||range[1]!==message.attachments.length) {
+  if (byteRange[0]!==0||byteRange[1]!==file.size) {
     res.status(206);
     res.set('Content-Length', byteRange[1]-byteRange[0]);
     res.set('Content-Range', `bytes ${byteRange[0]}-${byteRange[1]-1}/${file.size}`);
@@ -334,19 +323,19 @@ app.get('/api/download', async function(req, res) {
     let stcut = i!==range[0];
     for await (const chunk of f.body) {
       let data = encrypt(chunk, user);
-      if (i===range[0]&&byteRange[0]%ChunkSize!==0) {
-        if (size+data.length<=byteRange[0]%ChunkSize) {
+      if (i===range[0]&&byteRange[0]%file.chunkSize!==0) {
+        if (size+data.length<=byteRange[0]%file.chunkSize) {
           size += data.length;
           continue;
         }
-        if (size+data.length>byteRange[0]%ChunkSize&&!stcut) {
+        if (size+data.length>byteRange[0]%file.chunkSize&&!stcut) {
           stcut = true;
-          data = data.slice(byteRange[0]%ChunkSize-size);
+          data = data.slice(byteRange[0]%file.chunkSize-size);
         }
       }
-      if (i===range[1]-1&&byteRange[1]%ChunkSize!==0) {
-        if (size+data.length>byteRange[1]%ChunkSize) {
-          data = data.slice(0, byteRange[1]%ChunkSize-size);
+      if (i===range[1]-1&&byteRange[1]%file.chunkSize!==0) {
+        if (size+data.length>byteRange[1]%file.chunkSize) {
+          data = data.slice(0, byteRange[1]%file.chunkSize-size);
           res.write(data);
           res.end();
           return;
@@ -482,7 +471,7 @@ app.post('/api/delete', async function(req, res) {
 // 404
 app.use(function(req, res) {
   res.status(404);
-  res.htms('pages/404.html');
+  res.sendFile(path.join(__dirname, 'pages/404.html'));
 });
 
 app.listen(process.env['port'], ()=>{
