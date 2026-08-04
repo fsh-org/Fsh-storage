@@ -2,9 +2,9 @@
 Easy online file storage.
 
 ## Features
-- File uploading
+- Multi file uploads
 - Drag and Drop
-- Filters
+- Sorting & Search
+- Easy file viewer
 - Renaming
 - Sharing
-- Multi file uploads
