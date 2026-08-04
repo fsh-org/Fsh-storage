@@ -56,21 +56,32 @@ async function getUser(req) {
 }
 function encrypt(file, id) {
   let key = (86 + id) % 256;
-  for (let i = 0; i < file.length; i++) {
-    file[i] = 255 - (file[i] ^ key);
-  }
+  for (let i = 0; i < file.length; i++) file[i] = 255 - (file[i] ^ key);
   return file;
 }
+let messageCache = new Map();
 async function getMessage(chid, msgid, action='GET') {
+  let kid = chid+'-'+msgid;
+  if (messageCache.has(kid)) return messageCache.get(kid);
   let message = await fetch(`https://discord.com/api/v10/channels/${chid}/messages/${msgid}`, {
     method: action,
     headers: {
       authorization: 'Bot '+process.env['token']
     }
   });
-  if (action==='GET') message = await message.json()
+  if (action==='GET') message = await message.json();
+  if (action==='GET'&&message?.message!=='You are being rate limited.') {
+    message.expire = Date.now()+5*60*1000; // 5 min
+    messageCache.set(kid, message);
+  }
   return message;
 }
+setInterval(()=>{
+  Array.from(messageCache.entries())
+    .forEach(entry=>{
+      if (entry[1].expire>Date.now()) messageCache.delete(entry[0]);
+    });
+}, 1*60*1000); // Every 1 min
 
 app.use(cors());
 app.use(bodyParser.urlencoded({
@@ -276,6 +287,14 @@ app.get('/api/download', async function(req, res) {
     });
     return;
   }
+  if (message.message==='You are being rate limited.') {
+    res.status(429);
+    res.json({
+      err: true,
+      msg: 'Wait a bit'
+    });
+    return;
+  }
   let file = files.get(user).filter(f=>f.message===req.query['m'])[0];
 
   res.set('Content-Type', file.type);
@@ -463,7 +482,7 @@ app.post('/api/delete', async function(req, res) {
     });
     return;
   }
-  let message = await getMessage(req.query['c']??process.env.channel, req.query['m'], 'DELETE');
+  await getMessage(req.query['c']??process.env.channel, req.query['m'], 'DELETE');
   files.set(await getUser(req), files.get(await getUser(req)).filter(f=>f.message!==req.query['m']));
   res.json({});
 });
